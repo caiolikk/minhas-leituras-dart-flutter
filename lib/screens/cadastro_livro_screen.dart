@@ -44,7 +44,8 @@ class _CadastroLivroScreenState extends State<CadastroLivroScreen> {
     final id = '${DateTime.now().microsecondsSinceEpoch}-'
         '${Random().nextInt(1 << 30)}';
 
-    Navigator.pop(
+    FocusScope.of(context).unfocus();
+    Navigator.pop<Livro>(
       context,
       Livro(id: id, titulo: titulo, autor: autor, status: _status),
     );
@@ -106,6 +107,7 @@ class _CadastroLivroScreenState extends State<CadastroLivroScreen> {
                   controller: _autorController,
                   textCapitalization: TextCapitalization.words,
                   textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _cadastrar(),
                   onChanged: (valor) {
                     if (_erroAutor != null && valor.trim().isNotEmpty) {
                       setState(() => _erroAutor = null);

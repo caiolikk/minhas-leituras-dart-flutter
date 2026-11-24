@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:minhas_leituras/main.dart';
 import 'package:minhas_leituras/models/livro.dart';
-import 'package:minhas_leituras/screens/lista_livros_screen.dart';
+import 'package:minhas_leituras/services/livro_storage.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+  });
   testWidgets('Exibe o estado inicial sem livros', (tester) async {
     await tester.pumpWidget(const MinhasLeiturasApp());
     await tester.pumpAndSettle();
@@ -23,9 +29,9 @@ void main() {
       status: 'Lendo',
     );
 
-    await tester.pumpWidget(
-      const MaterialApp(home: ListaLivrosScreen(livros: [livro])),
-    );
+    await LivroStorage().salvar([livro]);
+    await tester.pumpWidget(const MinhasLeiturasApp());
+    await tester.pumpAndSettle();
 
     expect(find.text('Dom Casmurro'), findsOneWidget);
     expect(find.text('Machado de Assis'), findsOneWidget);
@@ -86,5 +92,52 @@ void main() {
 
     expect(find.text('Nenhum livro cadastrado'), findsOneWidget);
     expect(find.text('Livro não salvo'), findsNothing);
+  });
+
+  testWidgets('Recupera cadastro ao recriar o aplicativo', (tester) async {
+    await tester.pumpWidget(const MinhasLeiturasApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Adicionar livro'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), 'O Hobbit');
+    await tester.enterText(find.byType(TextField).at(1), 'Tolkien');
+    await tester.ensureVisible(find.text('Cadastrar'));
+    await tester.tap(find.text('Cadastrar'));
+    await tester.pumpAndSettle();
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(const MinhasLeiturasApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('O Hobbit'), findsOneWidget);
+    expect(find.text('Tolkien'), findsOneWidget);
+    expect(find.text('Quero ler'), findsOneWidget);
+  });
+
+  testWidgets('Confirma exclusão e mantém a remoção ao reabrir',
+      (tester) async {
+    await LivroStorage().salvar([
+      const Livro(id: '1', titulo: 'O Hobbit', autor: 'Tolkien', status: 'Lendo'),
+    ]);
+    await tester.pumpWidget(const MinhasLeiturasApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Remover livro'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    expect(find.text('O Hobbit'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Remover livro'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remover'));
+    await tester.pumpAndSettle();
+    expect(find.text('Livro removido com sucesso.'), findsOneWidget);
+    expect(find.text('O Hobbit'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(const MinhasLeiturasApp());
+    await tester.pumpAndSettle();
+    expect(find.text('Nenhum livro cadastrado'), findsOneWidget);
   });
 }
