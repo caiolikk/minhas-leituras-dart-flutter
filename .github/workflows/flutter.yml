@@ -24,8 +24,48 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: dart format lib test
+      - run: dart format lib test integration_test test_driver
       - run: flutter analyze
       - run: flutter test
       - run: flutter build web
       - run: flutter build apk --debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: minhas-leituras-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+
+  persistencia-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.7'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Habilitar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Testar persistência após encerrar o aplicativo
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            flutter drive -d emulator-5554 --driver=test_driver/integration_test.dart --target=integration_test/persistencia_test.dart --dart-define=ETAPA=cadastro --keep-app-running
+            adb shell am force-stop br.com.caiolikk.minhas_leituras
+            flutter drive -d emulator-5554 --driver=test_driver/integration_test.dart --target=integration_test/persistencia_test.dart --dart-define=ETAPA=exclusao --keep-app-running
+            adb shell am force-stop br.com.caiolikk.minhas_leituras
+            flutter drive -d emulator-5554 --driver=test_driver/integration_test.dart --target=integration_test/persistencia_test.dart --dart-define=ETAPA=conferencia --keep-app-running
